@@ -14,7 +14,7 @@ import urllib.request
 url = "http://192.168.1.6/capture.jpg"
 
 # intialize the facemask model
-MODEL = load_model('C:/Users/caind/Desktop/COVADIUE/maskdetect_mobilenet/mask_detector.model')
+MODEL = load_model('PROTOTYPE/maskdet.model')
 
 # intialize mediapipe utilites
 MP_DRAWING         = mp.solutions.drawing_utils
@@ -144,7 +144,7 @@ with MP_FACE_MESH.FaceMesh(
 						# submit metadata to webserver
 						actual += f"{x}:{y}:{w}:{h}"
 						label = 1 if label=='MASK' else 0
-						metadata += f"{x_oled}:{y_oled}:{a_oled}:{label}:{distance}cm>"
+						metadata += f"{x_oled}:{y_oled}:{a_oled}:{label}:{distance}>"
       
 						print(f"Distance {distance}cm <> Area {area}px")
 			cv2.imshow("webcam", frame)
