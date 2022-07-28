@@ -1,30 +1,23 @@
 #include <U8g2lib.h>
 #include <Wire.h>
-#include <esp_camera.h>
-#include <esp32cam.h>
 #include <WebServer.h>
-// #include <Adafruit_MLX90614.h>
+#include <Adafruit_MLX90614.h>
 
-#define LED 33
-#define SDA 2
-#define SCL 14
-
-// infrared 
-// Adafruit_MLX90614 mlx = Adafruit_MLX90614();
 
 // wifi
 WebServer syncServer(80);
 const char* ssid = "PLDTHOMEFIBRdbb60";
 const char* password = "PLDTWIFIfbwm9";
 
-// define frame resolution
-static auto tinyRes = esp32cam::Resolution::find(128, 64);
-static auto loRes = esp32cam::Resolution::find(320, 240);
-static auto midRes = esp32cam::Resolution::find(640, 480);
-static auto hiRes = esp32cam::Resolution::find(800, 600);
+// infrared
+Adafruit_MLX90614 mlx = Adafruit_MLX90614();
 
 // page buffer hardware I2C
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
+
+// status
+bool oled_status;
+bool inf_status;
 
 char* cstr(String val) {
   const byte charLength = val.length()+1;
@@ -32,10 +25,8 @@ char* cstr(String val) {
   val.toCharArray(charArray, charLength);
   return strdup(charArray);
 }
-
-// ####################################
-// OLED DISPLAY
 void startDisplay(bool animation=false) {  
+  
   // u8g2.setFont(u8g2_font_bpixeldouble_tr);  // original
   // u8g2.drawStr(26, 34, "C0V4D1U3"); // write something to the internal memory
   // u8g2.setFont(u8g2_font_squeezed_b7_tr);   // looks like segoe ui variable
@@ -89,10 +80,6 @@ void startDisplay(bool animation=false) {
     u8g2.sendBuffer();
   }
 }
-
-
-// ####################################
-// WiFi CONNECT
 void connectWifi() {
   // Connect to Wi-Fi
   // WiFi.persistent(false);
@@ -106,87 +93,6 @@ void connectWifi() {
   Serial.print("IP Address: http://");
   Serial.println(WiFi.localIP());
 }
-
-
-
-// ####################################
-// ESP32 WEBCAMERA
-// send handle to server
-void serveJpg() {
-  auto frame = esp32cam::capture();
-  if (frame == nullptr) {
-    Serial.println("CAPTURE FAIL");
-    syncServer.send(503, "", "");
-    return;
-  }
-  Serial.printf("CAPTURE OK %dx%d %db\n", frame->getWidth(), frame->getHeight(),
-                static_cast<int>(frame->size()));
- 
-  syncServer.setContentLength(frame->size());
-  syncServer.send(200, "image/jpeg");
-  WiFiClient client = syncServer.client();
-  frame->writeTo(client);
-}
-// connect wifi then serve to url
-void startWebCam() {
-  // OV2640 camera module pins (CAMERA_MODEL_AI_THINKER)
-  #define PWDN_GPIO_NUM     32
-  #define RESET_GPIO_NUM    -1
-  #define XCLK_GPIO_NUM      0
-  #define SIOD_GPIO_NUM     26
-  #define SIOC_GPIO_NUM     27
-  #define Y9_GPIO_NUM       35
-  #define Y8_GPIO_NUM       34
-  #define Y7_GPIO_NUM       39
-  #define Y6_GPIO_NUM       36
-  #define Y5_GPIO_NUM       21
-  #define Y4_GPIO_NUM       19
-  #define Y3_GPIO_NUM       18
-  #define Y2_GPIO_NUM        5
-  #define VSYNC_GPIO_NUM    25
-  #define HREF_GPIO_NUM     23
-  #define PCLK_GPIO_NUM     22
-  
-  // OV2640 camera module
-  camera_config_t config;
-  config.ledc_channel = LEDC_CHANNEL_0;
-  config.ledc_timer = LEDC_TIMER_0;
-  config.pin_d0 = Y2_GPIO_NUM;
-  config.pin_d1 = Y3_GPIO_NUM;
-  config.pin_d2 = Y4_GPIO_NUM;
-  config.pin_d3 = Y5_GPIO_NUM;
-  config.pin_d4 = Y6_GPIO_NUM;
-  config.pin_d5 = Y7_GPIO_NUM;
-  config.pin_d6 = Y8_GPIO_NUM;
-  config.pin_d7 = Y9_GPIO_NUM;
-  config.pin_xclk = XCLK_GPIO_NUM;
-  config.pin_pclk = PCLK_GPIO_NUM;
-  config.pin_vsync = VSYNC_GPIO_NUM;
-  config.pin_href = HREF_GPIO_NUM;
-  config.pin_sscb_sda = SIOD_GPIO_NUM;
-  config.pin_sscb_scl = SIOC_GPIO_NUM;
-  config.pin_pwdn = PWDN_GPIO_NUM;
-  config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 30000000;
-  config.pixel_format = PIXFORMAT_JPEG;
-
-  // config for psram
-  config.frame_size = FRAMESIZE_UXGA;
-  config.jpeg_quality = 12;
-  config.fb_count = 2;
-
-  // Camera init
-  esp_err_t err = esp_camera_init(&config);
-  if (err != ESP_OK) {
-    Serial.printf("Camera init failed with error 0x%x", err);
-    ESP.restart();
-  }
-}
-
-
-
-// ####################################
-// WEBSERVER-BASED SERIAL
 void initServer() {
 
   syncServer.on("/", []() {
@@ -194,10 +100,8 @@ void initServer() {
   });  
 
   // one argument with multiple parameters
-  syncServer.on("/capture.jpg", []() {
-    if (!esp32cam::Camera.changeResolution(loRes)) {
-      Serial.println("SET-TY-RES FAIL");
-    } 
+  syncServer.on("/capture", []() {
+    syncServer.send(200, "text/plain", "welcome to capture!");
     if (syncServer.argName(0)=="metadata") { // prone to errors
       String metadata = syncServer.arg(0);
       String metaname = syncServer.argName(0);
@@ -256,25 +160,30 @@ void initServer() {
         //   Serial.println(String(celsius)+"C");
         // }     
       }
+      if (!inf_status) {
+        Serial.println("Could not find a infrared, check wiring!");
+      }
+      else {
+        Serial.print("Ambient = "); Serial.print(mlx.readAmbientTempC()); 
+        Serial.print("*C\tObject = "); Serial.print(mlx.readObjectTempC()); Serial.println("*C");
+        Serial.print("Ambient = "); Serial.print(mlx.readAmbientTempF()); 
+        Serial.print("*F\tObject = "); Serial.print(mlx.readObjectTempF()); Serial.println("*F");
+      }
+      
       u8g2.sendBuffer();
     }
-    serveJpg();
   });
 
   // multiple arguments with one parameter
   syncServer.on("/covscrape", [] {
-
-    syncServer.send(200, "text/plain", "");
+    syncServer.send(200, "text/plain", "welcome to covscrape!");
 
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_t0_11_tr);
     if (syncServer.argName(0)=="cases") {
-      String totalCases = syncServer.arg(0);
+      String activeCases = syncServer.arg(0);
       String metaname =  syncServer.argName(0);
-      String metainfo = "GET: "+metaname+" > "+totalCases;
-      Serial.printf("cases: %s\n",totalCases);
-
-      u8g2.drawStr(0,64, cstr("tCases: "+totalCases));
+      String metainfo = "GET: "+metaname+" > "+activeCases;
     } else {startDisplay(true);}
     if (syncServer.argName(1)=="death") {
       String totalDeath = syncServer.arg(1);
@@ -292,7 +201,7 @@ void initServer() {
       String latestDate = syncServer.arg(3);
       latestDate.replace("."," ");
       Serial.printf("nwdat: %s\n",latestDate);
-      u8g2.drawStr(0,18,cstr("As of "+latestDate+","));
+      u8g2.drawStr(0,15,cstr("As of "+latestDate+","));
     } 
     if (syncServer.argName(4)=="nwcas") {
       String latestCase = syncServer.arg(4);
@@ -302,7 +211,7 @@ void initServer() {
       for (byte n=0; latestCase.length() > n; n++) {
         x = 36-(6*n);  
       }
-      u8g2.drawStr(x,35,cstr(latestCase+" new cases"));
+      u8g2.drawStr(x,32,cstr(latestCase+" new cases"));
     } 
     if (syncServer.argName(5)=="nwdea") { 
       String latestDead = syncServer.arg(5);
@@ -312,8 +221,23 @@ void initServer() {
       for (byte n=0; latestDead.length() > n; n++) {
         x = 36-(6*n);  
       }
-      u8g2.drawStr(x,45,cstr(latestDead+" new deaths"));
+      u8g2.drawStr(x,42,cstr(latestDead+" new deaths"));
     } 
+    if (syncServer.argName(6)=="activ") {
+      String activeCases = syncServer.arg(6);
+      String metaname =  syncServer.argName(6);
+      String metainfo = "GET: "+metaname+" > "+activeCases;
+      Serial.printf("activ: %s\n",activeCases);
+      u8g2.drawStr(0,60, cstr("ACC "+activeCases));
+    }
+    if (syncServer.argName(7)=="wkper") {
+      String weekPercent = syncServer.arg(7);
+      String metaname =  syncServer.argName(7);
+      String metainfo = "GET: "+metaname+" > "+weekPercent;
+      Serial.printf("wkper: %s\n",weekPercent);
+      u8g2.drawStr(70,60, cstr("PTC "+weekPercent));
+    }
+
     u8g2.sendBuffer();
   });
 
@@ -335,17 +259,19 @@ void initServer() {
   });
 }
 
-
-// ####################################
-// MAIN SETUP & LOOP
-
 void setup() {
-  Wire.begin(SDA, SCL); // rewire clock and data pins
-  u8g2.begin();            //initialize with the I2C addr 0x3C (128x64)
-  // mlx.begin();          //Initialize MLX90614
+
+  Wire.begin();
   
-  // startup led alert  (inverted logic)
-  digitalWrite(LED, LOW);
+  byte sda = 26;
+  byte scl = 27;
+  uint32_t freq = 100000;
+  Wire1.begin(sda, scl, freq);
+
+  // u8g2.setI2CAddress(0x3C);
+  // u8g2.setBusClock(100000);
+  oled_status = u8g2.begin();    // Iinitialize with the I2C addr 0x3C (128x64)
+  inf_status = mlx.begin(0x5A, &Wire1);
 
   // Serial port for debugging purposes
   Serial.begin(115200);
@@ -354,8 +280,8 @@ void setup() {
 
   connectWifi();
   initServer();
-  startWebCam();
-  startDisplay();
+  // startInfrared();// 0x5A 
+  startDisplay(); // 0x3C
 
   // Start syncServer
   syncServer.begin(); 

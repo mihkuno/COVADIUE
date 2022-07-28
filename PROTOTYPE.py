@@ -11,10 +11,9 @@ from keras.models import load_model
 
 # webcam client
 import urllib.request
-url = "http://192.168.1.6/capture.jpg"
 
 # intialize the facemask model
-MODEL = load_model('PROTOTYPE/maskdet.model')
+MODEL = load_model('C:/Users/caind/Desktop/COVADIUE/PROTOTYPE/maskdet.model')
 
 # intialize mediapipe utilites
 MP_DRAWING         = mp.solutions.drawing_utils
@@ -23,8 +22,21 @@ MP_DRAWING_STYLES  = mp.solutions.drawing_styles
 
 DRAWING_SPEC = MP_DRAWING.DrawingSpec(thickness=1, circle_radius=1)
 
+# calculating the distance
+CM = 65 # measeured distance
+PX = 2000 # per measured area
 
-cv2.namedWindow("webcam", cv2.WINDOW_AUTOSIZE)
+# calculating the shrinked scale display
+xDISPLAY = 320
+yDISPLAY = 240
+xOLED = 128
+yOLED = 64
+
+cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+cam.set(cv2.CAP_PROP_FPS, 30)
+cam.set(cv2.CAP_PROP_FRAME_WIDTH, xDISPLAY)
+cam.set(cv2.CAP_PROP_FRAME_HEIGHT, yDISPLAY)
+cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
 
 # detect faces
 with MP_FACE_MESH.FaceMesh(
@@ -40,10 +52,9 @@ with MP_FACE_MESH.FaceMesh(
 			# press escape to exit
 			if cv2.waitKey(5) & 0xFF == 27:
 					break
-
-			img_resp = urllib.request.urlopen(url+'?metadata='+metadata)
-			imgnp = np.array(bytearray(img_resp.read()),dtype=np.uint8)
-			frame = cv2.imdecode(imgnp,-1) # bgr version
+			
+			urllib.request.urlopen('http://192.168.1.12/capture?metadata='+metadata)
+			ret, frame = cam.read()
 			# frame = cv2.flip(frame, 0) # flip camera vertically
 
 			frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # rgb version
@@ -85,53 +96,42 @@ with MP_FACE_MESH.FaceMesh(
 						stroke = (255, 255, 0)
 						x,y,w,h = (cx_min, cy_min, cx_max-cx_min, cy_max-cy_min)
 
-						try: ##########################################################
-							# The model takes an image of dimensions (224,224) as input
-							# so reshape our image to the same.
+						# try: ##########################################################
+						# 	# The model takes an image of dimensions (224,224) as input
+						# 	# so reshape our image to the same.
 
-							bruh = cv2.resize(frame[cy_min-16:cy_max+16,cx_min-22:cx_max+22], (224, 224))
+						# 	bruh = cv2.resize(frame[cy_min-16:cy_max+16,cx_min-22:cx_max+22], (224, 224))
 
-							# Convert the image to a numpy array
-							img = np.asarray(bruh)
+						# 	# Convert the image to a numpy array
+						# 	img = np.asarray(bruh)
 
-							# Normalize the image
-							normalize = (img.astype(np.float32) / 127.0) - 1
+						# 	# Normalize the image
+						# 	normalize = (img.astype(np.float32) / 127.0) - 1
 
-							# create the array of the right shape to feed into the keras model
-							data = np.ndarray(shape=(1, 224, 224, 3), dtype=np.float32)
+						# 	# create the array of the right shape to feed into the keras model
+						# 	data = np.ndarray(shape=(1, 224, 224, 3), dtype=np.float32)
 
-							#  Load the image into the array
-							data[0] = normalize
+						# 	#  Load the image into the array
+						# 	data[0] = normalize
 
-							# Predict the class
-							prediction = MODEL.predict(data)
+						# 	# Predict the class
+						# 	prediction = MODEL.predict(data)
 
-							if prediction[0][0] > 0.88: # mask
-								label = 'MASK'
-								stroke = (0,255,0)
-								cv2.putText(frame, label, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.3, stroke, 1)
+						# 	if prediction[0][0] > 0.88: # mask
+						# 		label = 'MASK'
+						# 		stroke = (0,255,0)
+						# 		cv2.putText(frame, label, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.3, stroke, 1)
 
-							elif prediction[0][1] > 0.7: # face
-								label = 'FACE'
-								stroke = (0,0,255)
-								cv2.putText(frame, label, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.3, stroke, 1)
+						# 	elif prediction[0][1] > 0.7: # face
+						# 		label = 'FACE'
+						# 		stroke = (0,0,255)
+						# 		cv2.putText(frame, label, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.3, stroke, 1)
 
-						except: #####################################
-								print('bounding box exceeded window')
-
+						# except: #####################################
+						# 		print('bounding box exceeded window')
 
 						area = w*h # input area
-
-						# calculating the distance
-						CM = 65 # measeured distance
-						PX = 2000 # per measured area
 						distance = int((CM*PX)/area)
-
-						# calculating the shrinked scale display
-						xDISPLAY = 320
-						yDISPLAY = 240
-						xOLED = 128
-						yOLED = 64
 
 						a_oled = int(sqrt((xOLED * yOLED * area) / (xDISPLAY * yDISPLAY))) # oled square area
 						x_oled = int((xOLED * x) / xDISPLAY) # oled square x value
@@ -141,6 +141,7 @@ with MP_FACE_MESH.FaceMesh(
 						cv2.rectangle(frame, (x, y), (cx_max, cy_max), stroke, 1)
 						cv2.putText(frame, str(distance)+'cm', (cx_max-30, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.3, stroke, 1)
 
+						label = 0
 						# submit metadata to webserver
 						actual += f"{x}:{y}:{w}:{h}"
 						label = 1 if label=='MASK' else 0
