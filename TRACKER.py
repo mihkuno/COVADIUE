@@ -68,16 +68,16 @@ def scrape1(p_snap, p_ktask, p_lock, data_snapshot):
     
     print(ccdate)     
         
-    with p_lock:
-        # check date of snapshot
+
+    # check date of snapshot    
+    if data_snapshot and ccdate == data_snapshot['nwdat']:
+        print('hello there!!!!!!------------------------')
+        p_ktask.value = True
+        return 0   
+    else:
+        print('NIIILIIKAAYYY________________________________')
         
-        print(data_snapshot)
-        if data_snapshot and ccdate == data_snapshot['nwdat']:
-            print('hello there!!!!!!------------------------')
-            p_ktask.value = True
-            return 0   
-        else:
-            print('NIIILIIKAAYYY________________________________')
+        with p_lock:
             p_snap.update({
                 "cases":f"{tcases}",
                 "death":f"{tdeath}",
@@ -86,17 +86,15 @@ def scrape1(p_snap, p_ktask, p_lock, data_snapshot):
                 "nwcas":f"{ncases}",
                 "nwdea":f"{ndeath}"
             })
-            
-            global url
-            
-            for h,v in p_snap.items():
-                url += f"{h}={v}&"
-            url = url[:-1]
-            
-            print(url)
-            urllib.request.urlopen(url)   
         
+        global url
         
+        for h,v in p_snap.items():
+            url += f"{h}={v}&"
+        url = url[:-1]
+        
+        print(url)
+        urllib.request.urlopen(url)   
         
   
 def scrape2(p_snap, p_ktask, p_lock):
@@ -133,40 +131,72 @@ def scrape2(p_snap, p_ktask, p_lock):
             
                 with p_lock:
                     p_snap.update({"wkper":f"{wkperc}"})
-                    
-                    global url
-        
-                    for h,v in p_snap.items():
-                        url += f"{h}={v}&"
-                    url = url[:-1]
-                    
-                    print(url)
-                    urllib.request.urlopen(url)
+                
+                global url
+    
+                for h,v in p_snap.items():
+                    url += f"{h}={v}&"
+                url = url[:-1]
+                
+                print(url)
+                urllib.request.urlopen(url)
                 
                 break  
             
-    
-        
-def scrape3(p_url, p_snap):
-    pass
-    # col_1 = 8 # column
-    # active = get(web[0], col_1)
+            
+def scrape3(p_snap, p_ktask, p_lock):
 
-    # print(f"_______________________________at sc3 {p_url.value}")
-    # url = p_url.value
-    # url += f"&activ={active}"
-    # p_url.value = url
+    td_column = 4 # column 
     
-    # urllib.request.urlopen(url)
-    # print(f'Active Cases: {active}')
-    # p_snap.update({"activ":f"{active}"})
+    print(web[0])
+    driver = webdriver('eager')
+    driver.get(web[0])
+    
+    if p_ktask.value:
+        print('bef quit 333')
+        driver.quit()
+        return 0
+    else:    
+        button = "//nav[@id='ctabstoday']//ul[@class='nav nav-tabs']//li[@id='nav-asia-tab']"
+        tab_asia = driver.find_element(By.XPATH, button)
+        tab_asia.click()
+        
+        rows = "//tbody/tr"
+        path = driver.find_elements(By.XPATH, rows)
+        
+        for row in path:
+            if p_ktask.value:
+                print('row quit 3333')
+                driver.quit()
+                return 0
+            col = row.find_elements(By.TAG_NAME, "td")
+            bucket = [x.text for x in col]
+            if bucket and bucket[1] in "Philippines":
+                driver.quit()
+                column = bucket[td_column]
+            
+                global url
+            
+                with p_lock:
+                    p_snap.update({"activ":f"{column}"})
+                        
+                for h,v in p_snap.items():
+                    url += f"{h}={v}&"
+                url = url[:-1]
+                
+                print(url)
+                urllib.request.urlopen(url)
+                
+                break  
+            
+        
      
     
 def snapscrape(data, skip_outdate_check=False):      
     
     date_snapshot = data['nwdat']
     date_current = date.today().strftime('%B.%d')
-    # date_current = 'July.30' # debug purposes
+    date_current = 'July.30' # debug purposes
     
     # check if data is outdated
     print(date.today().strftime('%B.%d'))
@@ -177,11 +207,13 @@ def snapscrape(data, skip_outdate_check=False):
         return is_outdated, data
     is_outdated = False
     
+    print('data that was recieved')
+    print(data)
     global url
     url += f"?cases={data['cases']}&death={data['death']}"
     url += f"&recov={data['recov']}&nwdat={data['nwdat']}"
     url += f"&nwcas={data['nwcas']}&nwdea={data['nwdea']}"
-    url += f"&wkper={data['wkper']}" #&activ={data['activ']}
+    url += f"&activ={data['activ']}&wkper={data['wkper']}"
     urllib.request.urlopen(url)
 
     return is_outdated, data
@@ -197,7 +229,8 @@ def webscrape(data_snapshot=None):
 
     process = [
         Process(target=scrape1, args=(p_snap, p_ktask, p_lock, data_snapshot)),
-        Process(target=scrape2, args=(p_snap, p_ktask, p_lock))
+        Process(target=scrape2, args=(p_snap, p_ktask, p_lock)),
+        Process(target=scrape3, args=(p_snap, p_ktask, p_lock))
     ]
     
     for p in process:
