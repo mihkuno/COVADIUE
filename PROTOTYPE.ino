@@ -36,7 +36,7 @@ void startDisplay(bool animation=false) {
     const byte y = 55;
     const byte a = 4;
     const byte g = 16;
-    const short sl = 2500;
+    const short sl = 400;
 
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_sonicmania_tr);
@@ -102,9 +102,9 @@ void initServer() {
   // one argument with multiple parameters
   syncServer.on("/capture", []() {
     syncServer.send(200, "text/plain", "welcome to capture!");
-    if (syncServer.argName(0)=="metadata") { // prone to errors
+    if (syncServer.argName(0) =="metadata") { // prone to errors
       String metadata = syncServer.arg(0);
-      String metaname = syncServer.argName(0);
+      String metaname = "value";
       String metainfo = "GET: "+metaname+" > "+metadata;
       
       Serial.println(metainfo);
@@ -146,30 +146,22 @@ void initServer() {
 
         const char*  cm = data[4];
         const char* msk = k==1? "MK" : "FC";
-        u8g2.drawStr(x, y-5, cstr(String(cm)+"cm"));
-        u8g2.drawStr(x+a-10, y-5, msk);   
+        u8g2.drawStr(x, y-2, cstr(String(cm)+"cm"));
+        u8g2.drawStr(x+a-7, y-2, msk);   
 
-        // if (atoi(cm) < 20) {
-        //   // read temperature
-        //   const byte bias = 10;
-        //   byte ambient = mlx.readAmbientTempC();
-        //   String celsius = String(mlx.readObjectTempC());
-        //   u8g2.drawStr(5,5,cstr(celsius));
-        //   // u8g2.drawStr(10,10,cstr("bias: "+String(bias)));
-
-        //   Serial.println(String(celsius)+"C");
-        // }     
-      }
-      if (!inf_status) {
-        Serial.println("Could not find a infrared, check wiring!");
-      }
-      else {
-        Serial.print("Ambient = "); Serial.print(mlx.readAmbientTempC()); 
-        Serial.print("*C\tObject = "); Serial.print(mlx.readObjectTempC()); Serial.println("*C");
-        Serial.print("Ambient = "); Serial.print(mlx.readAmbientTempF()); 
-        Serial.print("*F\tObject = "); Serial.print(mlx.readObjectTempF()); Serial.println("*F");
-      }
-      
+        if (atoi(cm) < 10) {
+          if (!inf_status) {
+            Serial.println("Could not find a infrared, check wiring!");
+          }
+          else {
+            float ambient = mlx.readAmbientTempC();
+            float tempC = mlx.readObjectTempC();
+            Serial.printf("Ambient = %f\n",ambient); 
+            Serial.printf("*C\tObject = %f*C\n",tempC); 
+            u8g2.drawStr(0,55,cstr(String(tempC)+" °C"));
+          }
+        }     
+      }      
       u8g2.sendBuffer();
     }
   });
@@ -177,67 +169,67 @@ void initServer() {
   // multiple arguments with one parameter
   syncServer.on("/covscrape", [] {
     syncServer.send(200, "text/plain", "welcome to covscrape!");
+    String latestDate, latestCase, latestDead;
 
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_t0_11_tr);
-    if (syncServer.argName(0)=="cases") {
-      String activeCases = syncServer.arg(0);
-      String metaname =  syncServer.argName(0);
-      String metainfo = "GET: "+metaname+" > "+activeCases;
-    } else {startDisplay(true);}
-    if (syncServer.argName(1)=="death") {
-      String totalDeath = syncServer.arg(1);
-      String metaname =  syncServer.argName(1);
-      String metainfo = "GET: "+metaname+" > "+totalDeath;
-      Serial.printf("death: %s\n",totalDeath);
+    
+    if (syncServer.args() <= 0) {
+      startDisplay(true);
     }
-    if (syncServer.argName(2)=="recov") {
-      String totalRecov = syncServer.arg(2);
-      String metaname =  syncServer.argName(2);
-      String metainfo = "GET: "+metaname+" > "+totalRecov;
-      Serial.printf("recov: %s\n",totalRecov);
-    }
-    if (syncServer.argName(3)=="nwdat") {
-      String latestDate = syncServer.arg(3);
-      latestDate.replace("."," ");
-      Serial.printf("nwdat: %s\n",latestDate);
-      u8g2.drawStr(0,15,cstr("As of "+latestDate+","));
-    } 
-    if (syncServer.argName(4)=="nwcas") {
-      String latestCase = syncServer.arg(4);
-      Serial.printf("nwcas: %s\n",latestCase);  
-
-      byte x = 0;
-      for (byte n=0; latestCase.length() > n; n++) {
-        x = 36-(6*n);  
+    
+    for (uint8_t i = 0; i < syncServer.args(); i++) {
+      if (syncServer.argName(i) =="cases") {
+        String activeCases = syncServer.arg(i);
+        String metaname =  "cases";
+        String metainfo = "GET: "+metaname+" > "+activeCases;
       }
-      u8g2.drawStr(x,32,cstr(latestCase+" new cases"));
-    } 
-    if (syncServer.argName(5)=="nwdea") { 
-      String latestDead = syncServer.arg(5);
-      Serial.printf("nwdea: %s\n",latestDead);
-
-      byte x = 0;
-      for (byte n=0; latestDead.length() > n; n++) {
-        x = 36-(6*n);  
+      if (syncServer.argName(i) =="death") {
+        String totalDeath = syncServer.arg(i);
+        String metaname =  "death";
+        String metainfo = "GET: "+metaname+" > "+totalDeath;
       }
-      u8g2.drawStr(x,42,cstr(latestDead+" new deaths"));
-    } 
-    if (syncServer.argName(6)=="activ") {
-      String activeCases = syncServer.arg(6);
-      String metaname =  syncServer.argName(6);
-      String metainfo = "GET: "+metaname+" > "+activeCases;
-      Serial.printf("activ: %s\n",activeCases);
-      u8g2.drawStr(0,60, cstr("ACC "+activeCases));
+      if (syncServer.argName(i) =="recov") {
+        String totalRecov = syncServer.arg(i);
+        String metaname =  "value";
+        String metainfo = "GET: "+metaname+" > "+totalRecov;
+      }
+      if (syncServer.argName(i) =="nwdat") {
+        latestDate = syncServer.arg(i);
+        latestDate.replace("."," ");
+        u8g2.drawStr(0,15,cstr("As of "+latestDate+","));
+      }
+      if (syncServer.argName(i) =="nwcas") {
+        latestCase = syncServer.arg(i);
+        Serial.printf("nwcas: %s\n",latestCase);  
+        byte x = 0;
+        for (byte n=0; latestCase.length() > n; n++) {
+          x = 36-(6*n);  
+        }
+        u8g2.drawStr(x,32,cstr(latestCase+" new cases"));
+      }
+      if (syncServer.argName(i) =="nwdea") { 
+        latestDead = syncServer.arg(i);
+        Serial.printf("nwdea: %s\n",latestDead);
+        byte x = 0;
+        for (byte n=0; latestDead.length() > n; n++) {
+          x = 36-(6*n);  
+        }
+        u8g2.drawStr(x,42,cstr(latestDead+" new deaths"));
+      }
+      if (syncServer.argName(i) =="wkper") {
+        String weekPercent = syncServer.arg(i);
+        String metaname =  "value";
+        String metainfo = "GET: "+metaname+" > "+weekPercent;
+        u8g2.drawStr(70,60, cstr("PTC "+weekPercent));
+      }
+      if (syncServer.argName(i) =="activ") {
+        String activeCases = syncServer.arg(i);
+        String metaname =  "value";
+        String metainfo = "GET: "+metaname+" > "+activeCases;
+        u8g2.drawStr(0,60, cstr("ACC "+activeCases));
+      }
     }
-    if (syncServer.argName(7)=="wkper") {
-      String weekPercent = syncServer.arg(7);
-      String metaname =  syncServer.argName(7);
-      String metainfo = "GET: "+metaname+" > "+weekPercent;
-      Serial.printf("wkper: %s\n",weekPercent);
-      u8g2.drawStr(70,60, cstr("PTC "+weekPercent));
-    }
-
     u8g2.sendBuffer();
   });
 
