@@ -9,8 +9,6 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
-import time
-start_time = time.time()
 
 web = [
     'https://www.worldometers.info/coronavirus/#main_table',
@@ -63,9 +61,18 @@ def scrape1(p_snap, p_ktask, p_lock, data_snapshot):
     
     # updates
     ccdate = mupdat[1][:-6].replace(" ", ".")
-    ndeath = mupdat[3][mupdat[3].index('and')+5:mupdat[3].index('new deaths')-1] if 'new deaths' in mupdat[3] else "0"
     ncases = mupdat[3][:mupdat[3].index('new cases')-1] if 'new cases' in mupdat[3] else "0"
     
+    if 'new deaths' in mupdat[3]:
+        start = mupdat[3].index('and')+4
+        end = mupdat[3].index('new deaths')-1
+        ndeath = mupdat[3][start:end]
+        print(start, end)
+    else:
+        ndeath = "0"
+        
+    print(mupdat)
+    print(ndeath)
     print(ccdate)     
         
 
@@ -106,7 +113,7 @@ def scrape2(p_snap, p_ktask, p_lock):
     driver.get(web[2])
     
     if p_ktask.value:
-        print('bef quit ')
+        print('bef quit 222')
         driver.quit()
         return 0
     else:    
@@ -188,15 +195,13 @@ def scrape3(p_snap, p_ktask, p_lock):
                 urllib.request.urlopen(url)
                 
                 break  
-            
-        
-     
-    
+       
+       
 def snapscrape(data, skip_outdate_check=False):      
     
     date_snapshot = data['nwdat']
     date_current = date.today().strftime('%B.%d')
-    date_current = 'July.30' # debug purposes
+    date_current = 'July.31' # debug purposes
     
     # check if data is outdated
     print(date.today().strftime('%B.%d'))
@@ -210,7 +215,7 @@ def snapscrape(data, skip_outdate_check=False):
     print('data that was recieved')
     print(data)
     global url
-    url += f"?cases={data['cases']}&death={data['death']}"
+    url += f"cases={data['cases']}&death={data['death']}"
     url += f"&recov={data['recov']}&nwdat={data['nwdat']}"
     url += f"&nwcas={data['nwcas']}&nwdea={data['nwdea']}"
     url += f"&activ={data['activ']}&wkper={data['wkper']}"
@@ -251,8 +256,9 @@ def webscrape(data_snapshot=None):
         skip_outdate_check = True
         snapscrape(data_snapshot, skip_outdate_check)
         
-        
-if __name__ == '__main__':
+
+def main():
+    address = url
     # load animation
     urllib.request.urlopen(url) 
     # check if snapshot exists
@@ -262,7 +268,7 @@ if __name__ == '__main__':
             if outdated:
                 webscrape(data)
     else:
-        webscrape()
-    
-    print("--- %s seconds ---" % (time.time() - start_time))
+        webscrape()    
+
+    return address
     

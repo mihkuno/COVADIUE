@@ -1,11 +1,16 @@
 #include <U8g2lib.h>
 #include <Wire.h>
 #include <WebServer.h>
+#include <WebSocketsServer.h>
 #include <Adafruit_MLX90614.h>
 
 
-// wifi
+// Globals
 WebServer syncServer(80);
+bool SOCKET_ACTIVE = true;
+WebSocketsServer webSocket = WebSocketsServer(81);
+
+// wifi
 const char* ssid = "PLDTHOMEFIBRdbb60";
 const char* password = "PLDTWIFIfbwm9";
 
@@ -272,12 +277,52 @@ void setup() {
 
   connectWifi();
   initServer();
-  // startInfrared();// 0x5A 
   startDisplay(); // 0x3C
+  // nope! startInfrared();// 0x5A 
 
-  // Start syncServer
-  syncServer.begin(); 
+
+  webSocket.begin();
+  syncServer.begin();
+
+  // socket server event assign callback
+  webSocket.onEvent([](uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
+
+  // Figure out the type of WebSocket event
+  switch(type) {
+
+    // Client has disconnected
+    case WStype_DISCONNECTED:
+      Serial.printf("[%u] Disconnected!\n", num);
+      break;
+
+    // New client has connected
+    case WStype_CONNECTED:
+      {
+        IPAddress ip = webSocket.remoteIP(num);
+        Serial.printf("[%u] Connection from ", num);
+        Serial.println(ip.toString());
+      
+        Serial.printf("[%u] Text: %s\n", num, "SOCKET_ACTIVE");
+        webSocket.sendTXT(num, "SOCKET_ACTIVE");
+      }
+      break;
+
+    // Echo text message back to client
+    case WStype_TEXT:
+      Serial.printf("[%u] Text: %s\n", num, payload);
+      Serial.println((char * )payload);
+
+      if ((char * )payload == "CLOSE_SOCKET") {
+        webSocket.sendTXT(num, "CLOSED_SOCKET");
+        
+        SOCKET_ACTIVE = false;
+      }
+      break;
+  }
+});
+
 }
 void loop() {
+  webSocket.loop();
   syncServer.handleClient();
 }
