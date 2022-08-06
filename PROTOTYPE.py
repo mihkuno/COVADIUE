@@ -8,13 +8,13 @@ def main():
 	import mediapipe as mp
 
 	# # image classification
-	from keras.models import load_model
+	# from keras.models import load_model
 
 	# webcam client
 	import urllib.request
 
 	# intialize the facemask model
-	MODEL = load_model('C:/Users/caind/Desktop/COVADIUE/PROTOTYPE/maskdet.model')
+	# MODEL = load_model('C:/Users/caind/Desktop/COVADIUE/PROTOTYPE/maskdet.model')
 
 	# intialize mediapipe utilites
 	MP_DRAWING         = mp.solutions.drawing_utils
@@ -27,11 +27,21 @@ def main():
 	CM = 65 # measeured distance
 	PX = 2000 # per measured area
 
-	# calculating the shrinked scale display
-	xDISPLAY = 320
-	yDISPLAY = 240
+	# to proportion display scale
+	xDISPLAY = 320*2
+	yDISPLAY = 240*2
 	xOLED = 128
 	yOLED = 64
+ 
+	# mapping roi frame to oled
+	y_min = int(yDISPLAY/2)
+	y_max = -130
+	x_min = int(xDISPLAY/2)+20
+	x_max = -90
+	
+	# roi frame length and width
+	xmin_frame = (x_min + x_max)
+	ymin_frame = (y_min + y_max)
 
 	cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 	cam.set(cv2.CAP_PROP_FPS, 30)
@@ -43,9 +53,9 @@ def main():
 	with MP_FACE_MESH.FaceMesh(
 		# setup facemesh detect config
 		max_num_faces=3,
-		refine_landmarks=True,
-		min_detection_confidence=0.5,
-		min_tracking_confidence=0.5) as face_mesh:
+		refine_landmarks=True, 
+		min_detection_confidence=0.45,
+		min_tracking_confidence=0.45) as face_mesh:
 
 		metadata = a_oled = x_oled = y_oled = ""
 		while True:
@@ -54,8 +64,10 @@ def main():
 				if cv2.waitKey(5) & 0xFF == 27:
 						break
 				
-				urllib.request.urlopen('http://192.168.1.12/capture?metadata='+metadata)
+				urllib.request.urlopen('http://192.168.1.10/capture?metadata='+metadata)
+				
 				ret, frame = cam.read()
+				frame = frame[y_min:y_max, x_min:x_max]
 				# frame = cv2.flip(frame, 0) # flip camera vertically
 
 				frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # rgb version
@@ -134,9 +146,11 @@ def main():
 							area = w*h # input area
 							distance = int((CM*PX)/area)
 
-							a_oled = int(sqrt((xOLED * yOLED * area) / (xDISPLAY * yDISPLAY))) # oled square area
-							x_oled = int((xOLED * x) / xDISPLAY) # oled square x value
-							y_oled = int((yOLED * y) / yDISPLAY) # oled square y value
+							print(xmin_frame, ymin_frame)
+
+							a_oled = int(sqrt((xOLED * yOLED * area) / (xmin_frame * ymin_frame)))+10 # oled square area
+							x_oled = int((xOLED * x) / xmin_frame)-5 # oled square x value
+							y_oled = int((yOLED * y) / ymin_frame)-5 # oled square y value
 
 							# update local information
 							cv2.rectangle(frame, (x, y), (cx_max, cy_max), stroke, 1)

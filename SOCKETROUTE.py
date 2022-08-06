@@ -12,7 +12,7 @@ ws = websocket.WebSocket()
 
 while True:
     try:
-        ws.connect('ws://192.168.1.12:81')
+        ws.connect('ws://192.168.1.10:81')
         print('connected to websocket server')
         ws.send('CLOSE_SOCKET')
         # wait for server to respond
@@ -28,9 +28,9 @@ print('__WEBSOCKET LISTEN COMPLETE__')
 print('proceeding to webscrape...')
 
 if __name__ == '__main__':
-    address = tck.main()
+    # address = tck.main()
     print("--- %s seconds ---" % (time.time() - start_time))
     session = ptp.main()  
-    if session:
-        urllib.request.urlopen(address)
+    # if session:
+    #     urllib.request.urlopen(address)
 
