@@ -1,5 +1,5 @@
 # COVADIUE
-DOST computer vision and information system intervention. An approach to raise the user's awareness against COVID-19. It uses an ESP32 microcontroller with multiple with infrared sensors and webscrapes covid trackers. (forecasting: unfinished)
+A DOST project computer vision and information intervention system. An approach to raise the user's awareness against COVID-19. It uses an ESP32 with multiple sensors such as infrared and also webscrapes covid trackers forcasting alternative. (forecasting: unfinished)
 
 > [COVADIEU: A Multifunctional Artificial Intelligence of Things Smart Glasses for Improving Non-Pharmaceutical Interventions](https://drive.google.com/file/d/1brNfHbOd3f4OLlb-dJxOSH2rVwOqdGS0/view?usp=sharing)
 
